@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>UFO 운석 피하기2</title>
+    <title>UFO 운석 피하기</title>
     <style>
         body {
             margin: 0;
@@ -106,18 +106,18 @@
         </div>
         <div id="instructions">
             <h2>UFO 운석 피하기</h2>
-            <p>PC: 좌우 화살표 키로 이동</p>
+            <p>PC: 좌우 화살표 키로 이동, 스페이스바로 미사일 발사</p>
             <p>모바일: 화면 좌우 터치로 이동</p>
-            <p><strong>스페이스바를 눌러 시작!</strong></p>
+            <p><strong>스페이스바 또는 화면 터치로 시작!</strong></p>
         </div>
         <div id="gameOver">
             <h2>GAME OVER</h2>
             <p id="finalTime">생존 시간: 0초</p>
-            <p>스페이스바를 눌러 재시작</p>
-            <p class="mobile-only">(모바일: 화면 터치)</p>
+            <p>스페이스바 또는 화면 터치로 재시작</p>
         </div>
         <div class="mobile-controls">
             <button class="mobile-btn" id="leftBtn">←</button>
+            <button class="mobile-btn" id="fireBtn">🚀</button>
             <button class="mobile-btn" id="rightBtn">→</button>
         </div>
     </div>
@@ -146,6 +146,9 @@
 
         // 운석 배열
         let asteroids = [];
+        
+        // 미사일 배열
+        let missiles = [];
 
         // 키 입력 상태
         const keys = {
@@ -196,8 +199,24 @@
             }
         }
 
-        // 운석 생성
-        function createAsteroid() {
+        // 미사일 생성
+        function createMissile() {
+            return {
+                x: ufo.x,
+                y: ufo.y - 15,
+                width: 3,
+                height: 10,
+                speed: 8
+            };
+        }
+
+        // 미사일 그리기
+        function drawMissile(missile) {
+            ctx.fillStyle = '#00ff00';
+            ctx.fillRect(missile.x - 1, missile.y, 2, 8);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(missile.x - 0.5, missile.y, 1, 4);
+        }
             return {
                 x: Math.random() * (canvas.width - 20),
                 y: -20,
@@ -288,6 +307,24 @@
                 asteroid.speed += 0.001; // 점점 빨라짐
             });
 
+            // 미사일 업데이트
+            missiles.forEach(missile => {
+                missile.y -= missile.speed;
+            });
+
+            // 화면 밖으로 나간 미사일 제거
+            missiles = missiles.filter(missile => missile.y > -50);
+
+            // 미사일과 운석 충돌 검사
+            missiles.forEach((missile, missileIndex) => {
+                asteroids.forEach((asteroid, asteroidIndex) => {
+                    if (checkCollision(missile, asteroid)) {
+                        missiles.splice(missileIndex, 1);
+                        asteroids.splice(asteroidIndex, 1);
+                    }
+                });
+            });
+
             // 화면 밖으로 나간 운석 제거
             asteroids = asteroids.filter(asteroid => asteroid.y < canvas.height + 50);
 
@@ -320,6 +357,9 @@
                 // UFO 그리기
                 drawUFO();
 
+                // 미사일들 그리기
+                missiles.forEach(drawMissile);
+
                 // 운석들 그리기
                 asteroids.forEach(drawAsteroid);
             }
@@ -331,6 +371,7 @@
             gameStartTime = Date.now();
             survivedTime = 0;
             asteroids = [];
+            missiles = [];
             ufo.x = 400;
             ufo.y = 500;
             
@@ -366,6 +407,8 @@
                 case 'Space':
                     if (gameState === 'waiting' || gameState === 'gameOver') {
                         startGame();
+                    } else if (gameState === 'playing') {
+                        missiles.push(createMissile());
                     }
                     e.preventDefault();
                     break;
@@ -385,13 +428,16 @@
 
         // 모바일 터치 이벤트
         let touchStartX = 0;
+        let isMoving = false;
         
         canvas.addEventListener('touchstart', (e) => {
             e.preventDefault();
             touchStartX = e.touches[0].clientX;
+            isMoving = false;
             
-            if (gameState === 'gameOver') {
+            if (gameState === 'waiting' || gameState === 'gameOver') {
                 startGame();
+                return;
             }
         });
 
@@ -403,6 +449,7 @@
             const deltaX = touchX - touchStartX;
             
             if (Math.abs(deltaX) > 10) {
+                isMoving = true;
                 keys.left = deltaX < 0;
                 keys.right = deltaX > 0;
                 touchStartX = touchX;
@@ -411,8 +458,15 @@
 
         canvas.addEventListener('touchend', (e) => {
             e.preventDefault();
+            
+            // 움직이지 않고 터치가 끝났다면 미사일 발사
+            if (gameState === 'playing' && !isMoving) {
+                missiles.push(createMissile());
+            }
+            
             keys.left = false;
             keys.right = false;
+            isMoving = false;
         });
 
         // 모바일 버튼 이벤트
@@ -434,6 +488,14 @@
         document.getElementById('rightBtn').addEventListener('touchend', (e) => {
             e.preventDefault();
             keys.right = false;
+        });
+
+        // 미사일 발사 버튼
+        document.getElementById('fireBtn').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (gameState === 'playing') {
+                missiles.push(createMissile());
+            }
         });
 
         // 게임 시작
